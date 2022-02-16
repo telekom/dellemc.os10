@@ -1,0 +1,72 @@
+#jinja2: trim_blocks: True,lstrip_blocks: True
+# (c) Copyright 2022 Andreas Florath, Deutsche Telekom AG
+{##########################################
+Purpose:
+Configure PTP clock and interfaces commands for os10 Devices
+os10_ptp:
+  # boundary or end-to-end-transparent
+  clock: boundary
+  # This must be specified if clock is boundary
+  boundary:
+    # Enable also SyncE
+    hybrid: true
+    # g8275.2, g8275.1 or system-default
+    profile: g8275.1
+  domain: 24
+  # Set system time using PTP
+  system_time: true
+  interfaces:
+    ethernet 1/1/7:
+      role: slave
+    ethernet 1/1/9:
+      role: master
+#########################################}
+{% if os10_ptp is defined and os10_ptp %}
+{% if os10_ptp.clock == "boundary" %}
+  {% if os10_ptp.boundary.hybrid == "true" %}
+    {% set hybrid = "hybrid" %}
+  {% else %}
+    {% set hybrid = "" %}
+  {% endif %}
+ptp clock boundary {{ hybrid }} profile {{ os10_ptp.boundary.profile }}
+{% else %}
+ptp clock end-to-end-transparent
+{% endif %}
+ptp domain {{ os10_ptp.domain }}
+{% if os10_ptp.local_priority is defined and os10_ptp.local_priority %}
+ptp local-priority {{ os10_ptp.local_priority }}
+{% else %}
+no ptp local-priority
+{% endif %}
+{% if os10_ptp.priority1 is defined and os10_ptp.priority1 %}
+ptp priority1 {{ os10_ptp.priority1 }}
+{% else %}
+no ptp priority1
+{% endif %}
+{% if os10_ptp.priority2 is defined and os10_ptp.priority2 %}
+ptp priority2 {{ os10_ptp.priority2 }}
+{% else %}
+no ptp priority2
+{% endif %}
+{% if os10_ptp.source is defined and os10_ptp.source %}
+{% for version, address in os10_ptp.source.items() %}
+ptp source {{ version }} {{ address }}
+{% else %}
+no ptp source {{ version }}
+{% endfor %}
+{% endif %}
+{% if os10_ptp.system_time == "true" %}
+  {% set ptp_domain_neg = "" %}
+{% else %}
+  {% set ptp_domain_neg = "no " %}
+{% endif %}
+{{ ptp_domain_neg }}ptp system-time enable
+{% for interface, ifvalues in os10_ptp.interfaces.items() %}
+interface {{ interface }}
+ptp enable
+ptp role {{ ifvalues.role }}
+{% if os10_ptp.boundary.profile == 'g8275.1' %}
+ptp transport layer2
+{% endif %}
+{% endfor %}
+{% endif %}
